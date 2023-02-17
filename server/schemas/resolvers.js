@@ -1,42 +1,59 @@
-const { Thought } = require('../models');
-
+const { Thought } = require("../models");
+const { AuthenticationError } = require("apollo-server-express");
 const resolvers = {
   Query: {
-  Me: async (parent, args, context) => {
-    const foundUser = await User.findOne({
-        _id:context.user._id
+    Me: async (parent, args, context) => {
+      const foundUser = await User.findOne({
+        _id: context.user._id,
       });
-      return foundUser 
+      return foundUser;
     },
-
-    
   },
 
   Mutation: {
-    addThought: async (parent, { thoughtText, thoughtAuthor }) => {
-      return Thought.create({ thoughtText, thoughtAuthor });
+    login: async (parent, { email, password }) => {
+      const user = await User.findOne({ email });
+      if (!user) {
+        throw new AuthenticationError("Invalid Credentials.");
+      }
+
+      const correctPw = await user.isCorrectPassword(password);
+
+      if (!correctPw) {
+        throw new AuthenticationError("Invalid Credentials.");
+      }
+      const token = signToken(user);
+      return { token, user };
     },
-    addComment: async (parent, { thoughtId, commentText }) => {
-      return Thought.findOneAndUpdate(
-        { _id: thoughtId },
-        {
-          $addToSet: { comments: { commentText } },
-        },
-        {
-          new: true,
-          runValidators: true,
-        }
-      );
+    addUser: async (parent, args) => {
+      const user = await User.create(args);
+
+      const token = signToken(user);
+      return { token, user };
     },
-    removeThought: async (parent, { thoughtId }) => {
-      return Thought.findOneAndDelete({ _id: thoughtId });
+    saveBook: async (parent, { bookData }, context) => {
+      try {
+        const updatedUser = await User.findOneAndUpdate(
+          { _id: context.user._id },
+          { $addToSet: { savedBooks: bookData } },
+          { new: true, runValidators: true }
+        );
+        return updatedUser;
+      } catch (err) {
+        console.log(err);
+        throw new AuthenticationError("Invalid Credentials.");
+      }
     },
-    removeComment: async (parent, { thoughtId, commentId }) => {
-      return Thought.findOneAndUpdate(
-        { _id: thoughtId },
-        { $pull: { comments: { _id: commentId } } },
+    removeBook: async (parent, { bookId}, context) => {
+      const updatedUser = await User.findOneAndUpdate(
+        { _id: context.user._id },
+        { $pull: { savedBooks: { bookId} } },
         { new: true }
       );
+      if (!updatedUser) {
+        throw new AuthenticationError("Invalid Credentials.");
+      }
+      return updatedUser;
     },
   },
 };
