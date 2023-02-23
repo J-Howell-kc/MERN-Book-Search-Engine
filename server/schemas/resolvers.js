@@ -1,8 +1,9 @@
-const { Thought } = require("../models");
+const { User } = require("../models");
 const { AuthenticationError } = require("apollo-server-express");
+const { signToken } = require("../utils/auth");
 const resolvers = {
   Query: {
-    Me: async (parent, args, context) => {
+    me: async (parent, args, context) => {
       const foundUser = await User.findOne({
         _id: context.user._id,
       });
@@ -14,13 +15,13 @@ const resolvers = {
     login: async (parent, { email, password }) => {
       const user = await User.findOne({ email });
       if (!user) {
-        throw new AuthenticationError("Invalid Credentials.");
+        throw new AuthenticationError("Invalid Credentials email.");
       }
 
       const correctPw = await user.isCorrectPassword(password);
 
       if (!correctPw) {
-        throw new AuthenticationError("Invalid Credentials.");
+        throw new AuthenticationError("Invalid Credentials password.");
       }
       const token = signToken(user);
       return { token, user };
